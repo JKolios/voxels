@@ -5,7 +5,10 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"image/gif"
 	"os"
+	//"math"
+	"github.com/andybons/gogif"
 )
 
 func loadHeightMap(path string) heightMap {
@@ -45,7 +48,7 @@ func loadImage(path string) image.Image {
 	return img
 }
 
-func saveImage(path string, image image.Image) {
+func savePNG(path string, image image.Image) {
 	outfile, err := os.Create(path)
 	if err != nil {
 
@@ -55,6 +58,29 @@ func saveImage(path string, image image.Image) {
 
 	defer outfile.Close()
 	png.Encode(outfile, image)
+}
+
+func saveGIF(path string, images []image.Image, frameDelay int) {
+	
+	outfile, err := os.Create(path)
+	if err != nil {
+
+		fmt.Println("Cannot save output file, error: %v\n", err.Error())
+		os.Exit(1)
+	}
+
+	defer outfile.Close()
+	
+	outGif := &gif.GIF{}	
+	quantizer := gogif.MedianCutQuantizer{NumColor: 64}
+	for _, img := range(images) {
+		bounds := img.Bounds()
+		palettedImage := image.NewPaletted(bounds, nil)
+		quantizer.Quantize(palettedImage, bounds, img, image.ZP)
+		outGif.Image = append(outGif.Image, palettedImage)
+		outGif.Delay = append(outGif.Delay, frameDelay)
+	}
+	gif.EncodeAll(outfile, outGif)
 }
 
 func main() {
@@ -67,8 +93,17 @@ func main() {
 	colorMap := loadImage("color_map.png")
 	fmt.Printf("First colormap color: %+v\n", colorMap.At(0, 0))
 	fmt.Println("Initializing Renderer...")
-	options := RenderOptions{horizonHeight: 120.0, heightScale: 120.0, viewDistance: 100, screenWidth: 800, screenHeight: 600}
+	options := RenderOptions{horizonHeight: 180.0, heightScale: 100.0, viewDistance: 200, screenWidth: 800, screenHeight: 600}
 	renderer := NewVoxelRenderer(heightMap, colorMap, &options)
-	image := renderer.Render(0.0, 0.0, 280.0, 200.0)
-	saveImage("out.png", image)
+	
+	//images := []image.Image{}
+
+	//for angle:= 0.0; angle <  2 * math.Pi; angle+= 0.2 {
+	//	images = append(images,renderer.Render(0.0, 0.0, 120.0, angle))
+	//}
+	//saveGIF("out.gif",images, 10)
+	
+	image, cone := renderer.Render(400.0, 0.0, 120.0, 0.0)
+	savePNG("out.png", image)
+	savePNG("cone.png", cone)
 }
