@@ -5,15 +5,12 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
-	"fmt"
 )
 
-var white color.RGBA = color.RGBA{255,255,255, 255}
+var white color.RGBA = color.RGBA{255, 255, 255, 255}
 var red color.RGBA = color.RGBA{255, 0, 0, 255}
-var green color.RGBA = color.RGBA{0,255,0,255}
+var green color.RGBA = color.RGBA{0, 255, 0, 255}
 var blue color.RGBA = color.RGBA{0, 0, 255, 255}
-
-
 
 type heightMap [][]byte
 
@@ -41,39 +38,28 @@ func (renderer VoxelRenderer) Render(x, y, height, phi float64) (image.Image, im
 	sinphi := math.Sin(phi)
 	cosphi := math.Cos(phi)
 
-	mapRectangle := image.Rect(0, 0, renderer.cMap.Bounds().Max.X, renderer.cMap.Bounds().Max.Y)
-
-	
 	coneBounds := renderer.cMap.Bounds()
-  	cone := image.NewRGBA(coneBounds) 
-  	draw.Draw(cone, coneBounds, renderer.cMap, coneBounds.Min, draw.Src) 
+	cone := image.NewRGBA(coneBounds)
+	draw.Draw(cone, coneBounds, renderer.cMap, coneBounds.Min, draw.Src)
 
 	for z := renderer.options.viewDistance; z > 1; z-- {
 		floatZ := float64(z)
+		floatScreenWidth := float64(renderer.options.screenWidth)
 
-		pointLeft := image.Pt(int((-cosphi*floatZ-sinphi*floatZ)+x), int((sinphi*floatZ-cosphi*floatZ)+y))
-		pointRight := image.Pt(int((cosphi*floatZ-sinphi*floatZ)+x), int((-sinphi*floatZ-cosphi*floatZ)+y))
-		fmt.Println("Before")
-		fmt.Println(pointLeft, pointRight)
-		pointLeft = pointLeft.Mod(mapRectangle)
-		pointRight = pointRight.Mod(mapRectangle)
-		
-		cone.Set(pointLeft.X, pointLeft.Y, red)
-		cone.Set(pointRight.X, pointRight.Y, green)
+		leftX := math.Abs(math.Mod((-cosphi*floatZ - sinphi*floatZ) + x,  float64(renderer.cMap.Bounds().Max.X)))
+		leftY := math.Abs(math.Mod((sinphi*floatZ - cosphi*floatZ) + y,  float64(renderer.cMap.Bounds().Max.Y)))
+		rightX := math.Abs(math.Mod((cosphi*floatZ - sinphi*floatZ) + x,  float64(renderer.cMap.Bounds().Max.X)))
+		rightY := math.Abs(math.Mod((-sinphi*floatZ - cosphi*floatZ) + y,  float64(renderer.cMap.Bounds().Max.Y)))
 
-		fmt.Println("After")
-		fmt.Println(pointLeft, pointRight)
-		dx := float64(pointRight.X - pointLeft.X) / float64(renderer.options.screenWidth)
-		fmt.Println(dx)
-		dy := float64(pointRight.Y - pointLeft.Y) / float64(renderer.options.screenWidth)
-		fmt.Println(dy)
+		dx := (rightX - leftX) / floatScreenWidth
+		dy := (rightY - leftY) / floatScreenWidth
 		for i := 0; i < renderer.options.screenWidth; i++ {
 
-			cone.Set(pointLeft.X, pointLeft.Y, blue)
-			heightOnScreen := float64(byte(height)-renderer.hMap[pointLeft.X][pointLeft.Y])/floatZ*renderer.options.heightScale + renderer.options.horizonHeight
-			drawVerticalLineFromPoint(renderImage, image.Pt(i, int(heightOnScreen)), renderer.cMap.At(pointLeft.X, pointLeft.Y))
-			pointLeft.X += int(dx)
-			pointLeft.Y += int(dy)
+			cone.Set(int(leftX), int(leftY), blue)
+			heightOnScreen := float64(byte(height)-renderer.hMap[int(leftX)][int(leftY)])/floatZ*renderer.options.heightScale + renderer.options.horizonHeight
+			drawVerticalLineFromPoint(renderImage, image.Pt(i, int(heightOnScreen)), renderer.cMap.At(int(leftX), int(leftY)))
+			leftX += dx
+			leftY += dy
 		}
 	}
 
@@ -86,6 +72,6 @@ func drawVerticalLineFromPoint(img *image.RGBA, startPoint image.Point, color co
 	draw.Draw(img, drawRectangle, &image.Uniform{color}, image.ZP, draw.Src)
 }
 
-func fillImage(img *image.RGBA,color color.Color) {
- draw.Draw(img, img.Bounds(), &image.Uniform{color}, image.ZP, draw.Src)
+func fillImage(img *image.RGBA, color color.Color) {
+	draw.Draw(img, img.Bounds(), &image.Uniform{color}, image.ZP, draw.Src)
 }

@@ -1,14 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"github.com/andybons/gogif"
 	"image"
 	"image/color"
-	"image/png"
 	"image/gif"
+	"image/png"
+	"math"
 	"os"
-	//"math"
-	"github.com/andybons/gogif"
 )
 
 func loadHeightMap(path string) heightMap {
@@ -61,7 +62,7 @@ func savePNG(path string, image image.Image) {
 }
 
 func saveGIF(path string, images []image.Image, frameDelay int) {
-	
+
 	outfile, err := os.Create(path)
 	if err != nil {
 
@@ -70,10 +71,10 @@ func saveGIF(path string, images []image.Image, frameDelay int) {
 	}
 
 	defer outfile.Close()
-	
-	outGif := &gif.GIF{}	
-	quantizer := gogif.MedianCutQuantizer{NumColor: 64}
-	for _, img := range(images) {
+
+	outGif := &gif.GIF{}
+	quantizer := gogif.MedianCutQuantizer{NumColor: 256}
+	for _, img := range images {
 		bounds := img.Bounds()
 		palettedImage := image.NewPaletted(bounds, nil)
 		quantizer.Quantize(palettedImage, bounds, img, image.ZP)
@@ -85,6 +86,13 @@ func saveGIF(path string, images []image.Image, frameDelay int) {
 
 func main() {
 
+	var viewPointX = flag.Float64("x", 0.0, "X coordinate of the render viewpoint")
+	var viewPointY = flag.Float64("y", 0.0, "Y coordinate of the render viewpoint")
+	var viewPointZ = flag.Float64("z", 120.0, "Z coordinate of the render viewpoint")
+	var viewPointPhi = flag.Float64("phi", 0.0, "Phi angle of the render viewpoint")
+	var renderGif = flag.Bool("gif", false, "Flag for rendering a 360 degree GIF")
+	flag.Parse()
+
 	fmt.Println("Voxels")
 	fmt.Println("Loading Heightmap...")
 	heightMap := loadHeightMap("height_map.png")
@@ -93,17 +101,24 @@ func main() {
 	colorMap := loadImage("color_map.png")
 	fmt.Printf("First colormap color: %+v\n", colorMap.At(0, 0))
 	fmt.Println("Initializing Renderer...")
-	options := RenderOptions{horizonHeight: 180.0, heightScale: 100.0, viewDistance: 200, screenWidth: 800, screenHeight: 600}
+	options := RenderOptions{horizonHeight: 180.0, heightScale: 200.0, viewDistance: 200, screenWidth: 800, screenHeight: 600}
 	renderer := NewVoxelRenderer(heightMap, colorMap, &options)
-	
-	//images := []image.Image{}
 
-	//for angle:= 0.0; angle <  2 * math.Pi; angle+= 0.2 {
-	//	images = append(images,renderer.Render(0.0, 0.0, 120.0, angle))
-	//}
-	//saveGIF("out.gif",images, 10)
-	
-	image, cone := renderer.Render(400.0, 0.0, 120.0, 0.0)
-	savePNG("out.png", image)
-	savePNG("cone.png", cone)
+	if *renderGif {
+		images := []image.Image{}
+		coneImages := []image.Image{}
+
+		for angle := 0.0; angle < 2*math.Pi; angle += 0.1 {
+			newImage, newConeImage := renderer.Render(*viewPointX, *viewPointY, *viewPointZ, angle)
+			images = append(images, newImage)
+			coneImages = append(coneImages, newConeImage)
+		}
+		saveGIF("out.gif", images, 10)
+		saveGIF("cones.gif", coneImages,10)
+	} else {
+		image, cone := renderer.Render(*viewPointX, *viewPointY, *viewPointZ, *viewPointPhi)
+		savePNG("out.png", image)
+		savePNG("cone.png", cone)
+	}
+
 }
